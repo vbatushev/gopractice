@@ -4,18 +4,22 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/vbatushev/gopractice/internal/endpoints"
+	"github.com/vbatushev/gopractice/internal/server"
 )
 
 const (
-	HttpAddress = "127.0.0.1:8080"
+	// HTTPAddress - привязка сервера
+	HTTPAddress = "127.0.0.1:8080"
 )
 
 func main() {
-	// ENDPOINTS
-	http.HandleFunc(endpoints.HealthEndpoint, endpoints.HealthHandler)
+	practice := server.NewPracticeServer()
 
-	err := http.ListenAndServe(HttpAddress, nil)
+	// ENDPOINTS
+	http.HandleFunc(server.HealthPath, practice.HealthHandler)
+	http.HandleFunc(server.ContactsPath, practice.ContactsHandler)
+
+	err := http.ListenAndServe(HTTPAddress, nil)
 	if err != nil {
 		fmt.Println("Ошибка запуска сервера:", err)
 	}
