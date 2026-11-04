@@ -3,12 +3,12 @@ package stores
 
 import (
 	"encoding/json/v2"
-	"errors"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"slices"
+	"strconv"
 	"sync"
 
 	"github.com/vbatushev/gopractice/internal/models"
@@ -60,59 +60,93 @@ func (store *ContactStore) Add(w http.ResponseWriter, r *http.Request) {
 	}
 
 	indx := findUser(store.Contacts, contact.ID)
-	if indx < 0 {
+	if indx < 1 {
 		contact.ID = store.getLastID()
 		store.Contacts = append(store.Contacts, contact)
 	} else {
 		store.Contacts[indx] = contact
 	}
 
-	w.Write([]byte(`{ "status": "success", error: null }`))
+	result, err := json.Marshal(contact)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{ "status": "failed", "error": "%s" }`, err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	w.Write([]byte(result))
 }
 
 // GetAll - получение пользователей
-func (store *ContactStore) GetAll(w http.ResponseWriter, r *http.Request) ([]models.Contact, error) {
+func (store *ContactStore) GetAll(w http.ResponseWriter, _ *http.Request) {
 	store.Lock()
 	defer store.Unlock()
 
-	r.Body.Close()
-
-	w.Write([]byte("test"))
-
-	return store.Contacts, nil
+	contacts, err := json.Marshal(store.Contacts)
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{ "status": "failed", "error": "%s" }`, err.Error()), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(contacts)
 }
 
 // Get - получение контакта по ID
-func (store *ContactStore) Get(id int) (models.Contact, error) {
+func (store *ContactStore) Get(w http.ResponseWriter, r *http.Request) {
 	store.Lock()
 	defer store.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, `{ "status": "failed", "error": "неправильный id" }`, http.StatusBadRequest)
+		return
+	}
 
 	indx := findUser(store.Contacts, id)
 	if indx < 0 {
-		return models.Contact{}, errors.New("Не нашлось ничего")
+		http.Error(w, `{ "status": "failed", "error": "не найден пользователь" }`, http.StatusNotFound)
+		return
 	}
 
-	return store.Contacts[indx], nil
+	result, err := json.Marshal(store.Contacts[indx])
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{ "status": "failed", "error": "%s" }`, err.Error()), http.StatusNotFound)
+		return
+	}
+
+	w.Write(result)
 }
 
 // Remove - удаление контакта
-func (store *ContactStore) Remove(w http.ResponseWriter, r *http.Request) error {
+func (store *ContactStore) Remove(w http.ResponseWriter, r *http.Request) {
 	store.Lock()
 	defer store.Unlock()
 
-	r.Body.Close()
+	w.Header().Set("Content-Type", "application/json")
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, `{ "status": "failed", "error": "неправильный id" }`, http.StatusBadRequest)
+		return
+	}
 
-	w.Write([]byte("test"))
+	indx := findUser(store.Contacts, id)
+	if indx < 0 {
+		http.Error(w, `{ "status": "failed", "error": "не найден пользователь" }`, http.StatusNotFound)
+		return
+	}
 
-	return nil
+	store.Contacts = slices.Delete(store.Contacts, indx, indx+1)
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (store *ContactStore) getLastID() int {
 	if len(store.Contacts) == 0 {
-		return 0
+		return 1
 	}
 
-	maxID := 0
+	maxID := 1
 	for _, cnt := range store.Contacts {
 		if cnt.ID > maxID {
 			maxID = cnt.ID

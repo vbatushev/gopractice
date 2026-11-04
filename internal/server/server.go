@@ -13,6 +13,8 @@ const (
 	HealthPath = "/api/v1/health"
 	// ContactsPath - эндпоинт контактов
 	ContactsPath = "/api/v1/contacts"
+	// ContactPath - эндпоинт контакта
+	ContactPath = "/api/v1/contacts/{id}"
 )
 
 // PracticeServer - сервер практической работы
@@ -35,16 +37,22 @@ func (srv *PracticeServer) HealthHandler(w http.ResponseWriter, _ *http.Request)
 	}
 }
 
-// ContactsHandler - обработчик API
+// ContactsHandler - обработчик API для контактов
 func (srv *PracticeServer) ContactsHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == ContactsPath {
-		switch r.Method {
-		case http.MethodPost:
-			srv.ContactStore.Add(w, r)
-		case http.MethodGet:
-			srv.ContactStore.GetAll(w, r)
-		}
-	} else {
+	switch r.Method {
+	case http.MethodPost:
+		srv.ContactStore.Add(w, r)
+	case http.MethodGet:
+		srv.ContactStore.GetAll(w, r)
+	}
+}
 
+// ContactHandler - обработчик API для контакта
+func (srv *PracticeServer) ContactHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		srv.ContactStore.Get(w, r)
+	case http.MethodDelete:
+		srv.ContactStore.Remove(w, r)
 	}
 }

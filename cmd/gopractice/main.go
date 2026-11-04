@@ -1,3 +1,4 @@
+// Package main - основной пакет
 package main
 
 import (
@@ -14,12 +15,14 @@ const (
 
 func main() {
 	practice := server.NewPracticeServer()
+	mux := http.NewServeMux()
 
 	// ENDPOINTS
-	http.HandleFunc(server.HealthPath, practice.HealthHandler)
-	http.HandleFunc(server.ContactsPath, practice.ContactsHandler)
+	mux.HandleFunc(server.HealthPath, practice.HealthHandler)
+	mux.HandleFunc(server.ContactsPath, practice.ContactsHandler)
+	mux.HandleFunc(server.ContactPath, practice.ContactHandler)
 
-	err := http.ListenAndServe(HTTPAddress, nil)
+	err := http.ListenAndServe(HTTPAddress, mux)
 	if err != nil {
 		fmt.Println("Ошибка запуска сервера:", err)
 	}
