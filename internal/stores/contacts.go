@@ -5,12 +5,12 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"slices"
 	"strconv"
 	"sync"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/vbatushev/gopractice/internal/models"
 )
 
@@ -19,11 +19,14 @@ type ContactStore struct {
 	sync.Mutex
 
 	Contacts []models.Contact
+	lastID   int64
+	validate *validator.Validate
 }
 
 // NewContactStore - новое хранилище для контактов
 func NewContactStore() *ContactStore {
 	store := &ContactStore{}
+	store.validate = validator.New()
 	return store
 }
 
@@ -32,18 +35,11 @@ func (store *ContactStore) Add(w http.ResponseWriter, r *http.Request) {
 	store.Lock()
 	defer store.Unlock()
 
-	contentType := r.Header.Get("Content-Type")
 	w.Header().Set("Content-Type", "application/json")
 
-	mediatype, _, err := mime.ParseMediaType(contentType)
+	status, err := checkContentType(r, "application/json")
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{ "status": "failed", "error": "%s" }`, err.Error()), http.StatusBadRequest)
-		return
-	}
-
-	if mediatype != "application/json" {
-		http.Error(w, `{ "status": "failed", "error": "Ожидается Content-Type=application/json" }`, http.StatusUnsupportedMediaType)
-		return
+		http.Error(w, fmt.Sprintf(`{ "status": "failed", "error": "%s" }`, err.Error()), status)
 	}
 
 	var contact models.Contact
@@ -59,13 +55,15 @@ func (store *ContactStore) Add(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	indx := findUser(store.Contacts, contact.ID)
-	if indx < 1 {
-		contact.ID = store.getLastID()
-		store.Contacts = append(store.Contacts, contact)
-	} else {
-		store.Contacts[indx] = contact
+	contact.ID = store.lastID
+
+	errorsString, status := validateErrors(contact, store.validate)
+	if status != http.StatusOK {
+		http.Error(w, errorsString, status)
 	}
+
+	store.Contacts = append(store.Contacts, contact)
+	store.lastID++
 
 	result, err := json.Marshal(contact)
 	if err != nil {
@@ -103,7 +101,7 @@ func (store *ContactStore) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	indx := findUser(store.Contacts, id)
+	indx := findContact(store.Contacts, int64(id))
 	if indx < 0 {
 		http.Error(w, `{ "status": "failed", "error": "не найден пользователь" }`, http.StatusNotFound)
 		return
@@ -130,7 +128,7 @@ func (store *ContactStore) Remove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	indx := findUser(store.Contacts, id)
+	indx := findContact(store.Contacts, int64(id))
 	if indx < 0 {
 		http.Error(w, `{ "status": "failed", "error": "не найден пользователь" }`, http.StatusNotFound)
 		return
@@ -139,24 +137,4 @@ func (store *ContactStore) Remove(w http.ResponseWriter, r *http.Request) {
 	store.Contacts = slices.Delete(store.Contacts, indx, indx+1)
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func (store *ContactStore) getLastID() int {
-	if len(store.Contacts) == 0 {
-		return 1
-	}
-
-	maxID := 1
-	for _, cnt := range store.Contacts {
-		if cnt.ID > maxID {
-			maxID = cnt.ID
-		}
-	}
-	return maxID + 1
-}
-
-func findUser(contacts []models.Contact, id int) int {
-	return slices.IndexFunc(contacts, func(contact models.Contact) bool {
-		return contact.ID == id
-	})
 }
