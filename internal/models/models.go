@@ -19,5 +19,11 @@ type ValidationError struct {
 
 // Errors - ошибки валидации
 type Errors struct {
-	Errors []ValidationError
+	Errors []ValidationError `json:"errors"`
+}
+
+// ResponceJSON - структура ответа
+type ResponceJSON struct {
+	Status  string `json:"status"`
+	Message string `json:"error,omitempty"`
 }

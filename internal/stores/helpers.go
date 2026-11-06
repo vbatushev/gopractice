@@ -60,3 +60,24 @@ func validateErrors(contact models.Contact, vldr *validator.Validate) (string, i
 	}
 	return "", http.StatusOK
 }
+
+func responceJSONError(w http.ResponseWriter, status int, message string) error {
+	respJSON := models.ResponceJSON{
+		Message: message,
+	}
+	if status == http.StatusOK {
+		respJSON.Status = "success"
+	} else {
+		respJSON.Status = "failed"
+	}
+
+	data, err := json.Marshal(respJSON)
+	if err != nil {
+		return err
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, err = w.Write(data)
+	return err
+}

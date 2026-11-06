@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	// HealthPath - эндпоинт контактов
+	// HealthPath - эндпоинт проверки сервиса
 	HealthPath = "/api/v1/health"
 	// ContactsPath - эндпоинт контактов
 	ContactsPath = "/api/v1/contacts"
